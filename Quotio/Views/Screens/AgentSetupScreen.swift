@@ -7,8 +7,12 @@ import SwiftUI
 
 struct AgentSetupScreen: View {
     @Environment(QuotaViewModel.self) private var quotaViewModel
-    @State private var viewModel = AgentSetupViewModel()
     @State private var selectedAgentForConfig: CLIAgent?
+    @State private var hasLoadedOnce = false
+    
+    private var viewModel: AgentSetupViewModel {
+        quotaViewModel.agentSetupViewModel
+    }
     
     private var sortedAgents: [AgentStatus] {
         viewModel.agentStatuses.sorted { status1, status2 in
@@ -52,8 +56,10 @@ struct AgentSetupScreen: View {
             }
         }
         .task {
-            viewModel.setup(proxyManager: quotaViewModel.proxyManager)
-            await viewModel.refreshAgentStatuses()
+            if !hasLoadedOnce {
+                await viewModel.refreshAgentStatuses()
+                hasLoadedOnce = true
+            }
         }
         .sheet(item: $selectedAgentForConfig) { (agent: CLIAgent) in
             AgentConfigSheet(viewModel: viewModel, agent: agent)

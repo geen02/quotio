@@ -27,6 +27,17 @@ final class QuotaViewModel {
     var errorMessage: String?
     var oauthState: OAuthState?
     
+    private var _agentSetupViewModel: AgentSetupViewModel?
+    var agentSetupViewModel: AgentSetupViewModel {
+        if let vm = _agentSetupViewModel {
+            return vm
+        }
+        let vm = AgentSetupViewModel()
+        vm.setup(proxyManager: proxyManager)
+        _agentSetupViewModel = vm
+        return vm
+    }
+    
     /// Quota data per provider per account (email -> QuotaData)
     var providerQuotas: [AIProvider: [String: ProviderQuotaData]] = [:]
     
