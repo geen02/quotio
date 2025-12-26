@@ -7,6 +7,110 @@ import Foundation
 
 // MARK: - Models
 
+// MARK: - Model Group
+
+enum AntigravityModelGroup: String, CaseIterable, Identifiable {
+    case claude = "Claude"
+    case geminiPro = "Gemini Pro"
+    case geminiFlash = "Gemini Flash"
+    
+    var id: String { rawValue }
+    
+    var displayName: String { rawValue }
+    
+    var icon: String {
+        switch self {
+        case .claude: return "brain.head.profile"
+        case .geminiPro: return "sparkles"
+        case .geminiFlash: return "bolt.fill"
+        }
+    }
+    
+    static func group(for modelName: String) -> AntigravityModelGroup? {
+        let name = modelName.lowercased()
+        
+        // Claude group includes gpt and oss models
+        if name.contains("claude") || name.contains("gpt") || name.contains("oss") {
+            return .claude
+        }
+        
+        if name.contains("gemini") && name.contains("pro") {
+            return .geminiPro
+        }
+        
+        if name.contains("gemini") && name.contains("flash") {
+            return .geminiFlash
+        }
+        
+        return nil
+    }
+}
+
+struct GroupedModelQuota: Identifiable, Sendable {
+    let group: AntigravityModelGroup
+    let models: [ModelQuota]
+    
+    var id: String { group.id }
+    
+    var percentage: Double {
+        models.map(\.percentage).min() ?? 0
+    }
+    
+    var formattedPercentage: String {
+        if percentage == percentage.rounded() {
+            return String(format: "%.0f%%", percentage)
+        }
+        return String(format: "%.2f%%", percentage)
+    }
+    
+    // Uses earliest reset time among all models in the group
+    var resetTime: String {
+        models.compactMap { model -> Date? in
+            ISO8601DateFormatter().date(from: model.resetTime)
+        }.min().map { date in
+            ISO8601DateFormatter().string(from: date)
+        } ?? ""
+    }
+    
+    var formattedResetTime: String {
+        guard !resetTime.isEmpty,
+              let date = ISO8601DateFormatter().date(from: resetTime) else {
+            return "—"
+        }
+        
+        let now = Date()
+        let interval = date.timeIntervalSince(now)
+        
+        if interval <= 0 {
+            return "now"
+        }
+        
+        let totalMinutes = Int(interval / 60)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        let days = hours / 24
+        let remainingHours = hours % 24
+        
+        if days > 0 {
+            if remainingHours > 0 {
+                return "\(days)d \(remainingHours)h"
+            }
+            return "\(days)d"
+        } else if hours > 0 {
+            if minutes > 0 {
+                return "\(hours)h \(minutes)m"
+            }
+            return "\(hours)h"
+        } else {
+            return "\(max(1, minutes))m"
+        }
+    }
+    
+    var displayName: String { group.displayName }
+}
+
+// MARK: - Models
+
 struct ModelQuota: Codable, Identifiable, Sendable {
     let name: String
     let percentage: Double
@@ -23,6 +127,10 @@ struct ModelQuota: Codable, Identifiable, Sendable {
             return String(format: "%.0f%%", percentage)
         }
         return String(format: "%.2f%%", percentage)
+    }
+    
+    var modelGroup: AntigravityModelGroup? {
+        AntigravityModelGroup.group(for: name)
     }
     
     var displayName: String {
@@ -97,6 +205,24 @@ struct ProviderQuotaData: Codable, Sendable {
         case "free": return "Free"
         default: return planType?.capitalized
         }
+    }
+    
+    var groupedModels: [GroupedModelQuota] {
+        var grouped: [AntigravityModelGroup: [ModelQuota]] = [:]
+        
+        for model in models {
+            guard let group = model.modelGroup else { continue }
+            grouped[group, default: []].append(model)
+        }
+        
+        return AntigravityModelGroup.allCases.compactMap { group in
+            guard let models = grouped[group], !models.isEmpty else { return nil }
+            return GroupedModelQuota(group: group, models: models)
+        }
+    }
+    
+    var hasGroupedModels: Bool {
+        models.contains { $0.modelGroup != nil }
     }
 }
 

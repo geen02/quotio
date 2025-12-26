@@ -403,8 +403,14 @@ private struct QuotaAccountRow: View {
             
             if !data.models.isEmpty {
                 HStack(spacing: 8) {
-                    ForEach(data.models.sorted { $0.name < $1.name }.prefix(3)) { model in
-                        QuotaModelBadge(model: model)
+                    if provider == .antigravity && data.hasGroupedModels {
+                        ForEach(data.groupedModels.prefix(3)) { groupedModel in
+                            GroupedQuotaModelBadge(groupedModel: groupedModel)
+                        }
+                    } else {
+                        ForEach(data.models.sorted { $0.name < $1.name }.prefix(3)) { model in
+                            QuotaModelBadge(model: model)
+                        }
                     }
                 }
             }
@@ -449,6 +455,54 @@ private struct QuotaModelBadge: View {
                 .frame(height: 4)
                 
                 Text(model.formattedPercentage)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(tintColor)
+                    .frame(width: 36, alignment: .trailing)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct GroupedQuotaModelBadge: View {
+    let groupedModel: GroupedModelQuota
+    
+    private var remainingPercent: Double {
+        groupedModel.percentage
+    }
+    
+    private var tintColor: Color {
+        if remainingPercent > 50 { return .green }
+        if remainingPercent > 20 { return .orange }
+        return .red
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 2) {
+                Image(systemName: groupedModel.group.icon)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+                
+                Text(groupedModel.displayName)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            HStack(spacing: 4) {
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.quaternary)
+                        Capsule()
+                            .fill(tintColor.gradient)
+                            .frame(width: proxy.size.width * min(1, remainingPercent / 100))
+                    }
+                }
+                .frame(height: 4)
+                
+                Text(groupedModel.formattedPercentage)
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(tintColor)
                     .frame(width: 36, alignment: .trailing)

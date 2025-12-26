@@ -186,9 +186,17 @@ struct AccountQuotaCard: View {
                     Divider()
                         .padding(.vertical, 4)
                     
-                    VStack(spacing: 16) {
-                        ForEach(data.models.sorted { $0.name < $1.name }) { model in
-                            ModelQuotaRow(model: model)
+                    if provider == .antigravity && data.hasGroupedModels {
+                        VStack(spacing: 16) {
+                            ForEach(data.groupedModels) { groupedModel in
+                                GroupedModelQuotaRow(groupedModel: groupedModel)
+                            }
+                        }
+                    } else {
+                        VStack(spacing: 16) {
+                            ForEach(data.models.sorted { $0.name < $1.name }) { model in
+                                ModelQuotaRow(model: model)
+                            }
                         }
                     }
                 } else if let message = account.statusMessage, !message.isEmpty {
@@ -410,6 +418,113 @@ private struct ModelQuotaRow: View {
                 }
             }
             .frame(height: 10)
+        }
+    }
+}
+
+private struct GroupedModelQuotaRow: View {
+    let groupedModel: GroupedModelQuota
+    
+    @State private var isExpanded = false
+    
+    private var remainingPercent: Double {
+        groupedModel.percentage
+    }
+    
+    private var tint: Color {
+        if remainingPercent > 50 { return .green }
+        if remainingPercent > 20 { return .orange }
+        return .red
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: groupedModel.group.icon)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(groupedModel.displayName)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    if groupedModel.models.count > 1 {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isExpanded.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text("\(groupedModel.models.count)")
+                                    .font(.caption2)
+                                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.quaternary)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Text(groupedModel.formattedPercentage)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(tint)
+                    
+                    if groupedModel.formattedResetTime != "—" {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.caption)
+                            Text(groupedModel.formattedResetTime)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.quaternary)
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.quaternary)
+                    Capsule()
+                        .fill(tint.gradient)
+                        .frame(width: proxy.size.width * min(1, remainingPercent / 100))
+                }
+            }
+            .frame(height: 10)
+            
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(groupedModel.models.sorted { $0.name < $1.name }) { model in
+                        HStack {
+                            Text(model.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(model.formattedPercentage)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(model.percentage > 50 ? .green : (model.percentage > 20 ? .orange : .red))
+                        }
+                        .padding(.leading, 24)
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
     }
 }
